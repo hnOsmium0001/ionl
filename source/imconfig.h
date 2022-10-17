@@ -126,3 +126,5 @@ namespace ImGui
 
 //---- Added by hnOsmium0001: define math operators for all uses of <imgui_internal.h>
 #define IMGUI_DEFINE_MATH_OPERATORS
+
+// #define IONL_DRAW_DEBUG_BOUNDING_BOXES
