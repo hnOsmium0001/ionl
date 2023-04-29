@@ -1,7 +1,5 @@
 #include "Resolve.DirectWrite.hpp"
-
-#include "../Utils.hpp"
-#include "Resolve.hpp"
+#ifdef FONT_ENUM_DWRITE_RESOLVER_AVAIL
 
 #include <wrl/client.h>
 #include <cstdint>
@@ -14,6 +12,7 @@
 
 using namespace FontEnum;
 using namespace FontEnum::details;
+namespace fs = std::filesystem;
 
 template <typename T>
 using ComPtr = Microsoft::WRL::ComPtr<T>;
@@ -27,7 +26,7 @@ static void SafeRelease(T*& ptr) {
 }
 
 // https://gist.github.com/xebecnan/6d070c93fb69f40c3673
-std::string WcharToUTF8(const wchar_t* src, size_t srcLen) {
+static std::string WcharToUTF8(const wchar_t* src, size_t srcLen) {
     if (!src) {
         return {};
     }
@@ -40,6 +39,27 @@ std::string WcharToUTF8(const wchar_t* src, size_t srcLen) {
     std::string res(length, '\0');
     WideCharToMultiByte(CP_UTF8, 0, src, srcLen, res.data(), length, nullptr, nullptr);
     return res;
+}
+
+static FontFileType MapDWriteFileTypeToOurs(DWRITE_FONT_FILE_TYPE fft) {
+    switch (fft) {
+        using enum FontFileType;
+        case DWRITE_FONT_FILE_TYPE_CFF: return CFF;
+        case DWRITE_FONT_FILE_TYPE_TRUETYPE: return TrueType;
+        case DWRITE_FONT_FILE_TYPE_OPENTYPE_COLLECTION: return TrueTypeCollection;
+
+        // We explicitly don't support Type1 fonts
+        case DWRITE_FONT_FILE_TYPE_TYPE1_PFM:
+        case DWRITE_FONT_FILE_TYPE_TYPE1_PFB:
+        // .FON files
+        case DWRITE_FONT_FILE_TYPE_VECTOR:
+        case DWRITE_FONT_FILE_TYPE_BITMAP:
+        // Other formats not even DirectWrite recognizes, we don't need to spend the effort categorizing them
+        // TODO does Graphite fonts belong here?
+        case DWRITE_FONT_FILE_TYPE_UNKNOWN:
+            return Unknown;
+    }
+    return FontFileType::Unknown;
 }
 
 DwCtx::InitResult DwCtx::Init() noexcept {
@@ -75,7 +95,7 @@ void DwCtx::EnumSystemFonts() {
         ComPtr<IDWriteFontFamily> fontFamily;
         TRY_HRESULT(sysFontCollection->GetFontFamily(i, &fontFamily));
 
-        size_t generatedBeginIdx = foundFonts.size();
+        size_t generatedBeginIdx = enumeratedFonts.size();
         size_t generatedCnt = 0;
         UINT32 fontCnt = fontFamily->GetFontCount();
         for (UINT32 j = 0; j < fontCnt; ++j) {
@@ -129,13 +149,28 @@ void DwCtx::EnumSystemFonts() {
                 auto filePath = std::make_unique<WCHAR[]>(filePathLen + 1);
                 TRY_HRESULT(localLoader->GetFilePathFromKey(refKey, refKeySize, filePath.get(), filePathLen + 1));
 
+                // NOTE: "dw" here stands for "DirectWrite", not the "double word" seen usually in win32 programming
+                BOOL dwSupported;
+                DWRITE_FONT_FILE_TYPE dwFileType;
+                DWRITE_FONT_FACE_TYPE dwFaceType;
+                UINT32 numFaces;
+                fontFile->Analyze(&dwSupported, &dwFileType, &dwFaceType, &numFaces);
+
+                auto ourFileType = MapDWriteFileTypeToOurs(dwFileType);
+                if (ourFileType == FontFileType::Unknown) {
+                    continue;
+                }
+
                 DwEnumeratedFont ef{
-                    .fontFile = std::filesystem::path(filePath.get(), filePath.get() + filePathLen),
+                    .representativeFont = {
+                        .file = fs::path(filePath.get(), filePath.get() + filePathLen),
+                        .fileType = ourFileType,
+                    },
                     .style = font->GetStyle(),
                     .stretch = font->GetStretch(),
                     .weight = font->GetWeight(),
                 };
-                foundFonts.push_back(std::move(ef));
+                enumeratedFonts.push_back(std::move(ef));
                 generatedCnt += 1;
             }
         }
@@ -166,3 +201,12 @@ void DwCtx::EnumSystemFonts() {
         }
     }
 }
+
+void DwCtx::ClearKnownFonts() {
+    enumeratedFonts.clear();
+    familyNameMap.clear();
+}
+
+DwCtx details::gDwCtx{};
+
+#endif

@@ -1,5 +1,11 @@
 #pragma once
 
+#include "Resolve.hpp"
+#ifdef FONT_ENUM_DWRITE_RESOLVER_AVAIL
+
+#include "../Utils.hpp"
+
+#define WIN32_LEAN_AND_MEAN
 #include <dwrite.h>
 #include <robin_hood.h>
 #include <filesystem>
@@ -9,7 +15,7 @@
 namespace FontEnum::details {
 
 struct DwEnumeratedFont {
-    std::filesystem::path fontFile;
+    Font representativeFont;
     DWRITE_FONT_STYLE style;
     DWRITE_FONT_STRETCH stretch;
     DWRITE_FONT_WEIGHT weight;
@@ -23,8 +29,8 @@ struct DwFamily {
 
 struct DwCtx {
     IDWriteFactory* factory = nullptr;
-    std::vector<DwEnumeratedFont> foundFonts;
-    robin_hood::unordered_map<std::string, DwFamily> familyNameMap;
+    std::vector<DwEnumeratedFont> enumeratedFonts;
+    robin_hood::unordered_map<std::string, DwFamily, StringHash, StringEqual> familyNameMap;
 
     enum class InitResult {
         Success,
@@ -34,6 +40,13 @@ struct DwCtx {
     ~DwCtx();
 
     void EnumSystemFonts();
-} gDWriteCtx;
+    void ClearKnownFonts();
+} ;
+
+extern DwCtx gDwCtx;
 
 } // namespace FontEnum::details
+
+#else
+#warning "Included Resolve.DirectWrite.hpp when this resolver is not implemented (disabled by FONT_ENUM_DWRITE_RESOLVER_AVAIL)."
+#endif

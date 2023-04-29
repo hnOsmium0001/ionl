@@ -1,6 +1,6 @@
 #pragma once
 
-#include <utility>
+#include <robin_hood.h>
 #include <utility>
 #include <variant>
 
@@ -21,17 +21,17 @@
 #define PRINTF_STRING_VIEW(s) (int)s.size(), s.data()
 
 #if defined(_MSC_VER)
-#	define UNREACHABLE __assume(0)
+#define UNREACHABLE __assume(0)
 #elif defined(__GNUC__) || defined(__clang__)
-#	define UNREACHABLE __builtin_unreachable()
+#define UNREACHABLE __builtin_unreachable()
 #else
-#	define UNREACHABLE
+#define UNREACHABLE
 #endif
 
 #if _WIN32
-#	define PLATFORM_PATH_STR "%ls"
+#define PLATFORM_PATH_STR "%ls"
 #else
-#	define PLATFORM_PATH_STR "%s"
+#define PLATFORM_PATH_STR "%s"
 #endif
 
 template <typename... Ts>
@@ -46,6 +46,31 @@ template <typename TVariant, typename... Ts>
 auto VisitVariantOverloaded(TVariant&& v, Ts&&... cases) {
     return std::visit(Overloaded{ std::forward<Ts>(cases)... }, std::forward<TVariant>(v));
 }
+
+struct StringHash {
+    using is_transparent = void;
+
+    std::size_t operator()(const std::string& key) const { return robin_hood::hash_bytes(key.c_str(), key.size()); }
+    std::size_t operator()(std::string_view key) const { return robin_hood::hash_bytes(key.data(), key.size()); }
+    std::size_t operator()(const char* key) const { return robin_hood::hash_bytes(key, std::strlen(key)); }
+};
+
+struct StringEqual {
+    using is_transparent = int;
+
+    bool operator()(std::string_view lhs, const std::string& rhs) const {
+        const std::string_view view = rhs;
+        return lhs == view;
+    }
+
+    bool operator()(const char* lhs, const std::string& rhs) const {
+        return std::strcmp(lhs, rhs.c_str()) == 0;
+    }
+
+    bool operator()(const std::string& lhs, const std::string& rhs) const {
+        return lhs == rhs;
+    }
+};
 
 template <typename TCleanupFunc>
 class ScopeGuard {

@@ -1,31 +1,59 @@
 #pragma once
 
+// TODO "blob resolver" that lookups from a list of fonts compiled into the binary?
+//      have some kind of comp-time registration mechanism by declaring byte arrays or something
+
+#define FONT_ENUM_FS_RESOLVER_AVAIL
+#ifdef _WIN32
+#define FONT_ENUM_DWRITE_RESOLVER_AVAIL
+#endif
+#ifdef __APPLE__
+#define FONT_ENUM_CORETEXT_RESOLVER_AVAIL
+#endif
+#ifdef __linux__
+#define FONT_ENUM_FONTCONFIG_RESOLVER_AVAIL
+#endif
+
 #include <filesystem>
 #include <string_view>
 #include <vector>
+#include <span>
 
 // NOTE: we wrap an internal structure instead of just some IResolver in order to avoid exposing the Resolve.*.hpp
 //  headers to end users, because they include other intrusive headers like Windows.h
 
 namespace FontEnum {
 
-// Counterpart to CSS's font-family string
-struct FontDescription {
-    // TODO
+enum class FontFileType {
+    // .ttf files, or .otf files with TrueType outlines
+    TrueType,
+    // .otf files with CFF outlines
+    CFF,
+    // NOTE: Even though this corresponds to the ".ttc" file extension, realistically it's used for the
+    // collection format specified by CFF (which evolved from the original TrueType Collection specs),
+    // and is compatible with all sorts of outlines. The "TrueType" in the name is just to correspond to
+    // the file extension.
+    TrueTypeCollection,
+    // To deal with the other file types supported by various APIs. If there is ever a font that we want
+    // to handle, it will always have an explicit entry above.
+    Unknown,
+};
 
-    void Append(const FontDescription& otherDesc);
-    void AppendFamily(std::string_view familyName);
+// Counterpart to CSS's font-family string
+// TODO do we want to support an owning version of this? i.e. std::vector<std::string>
+struct FamilyDescription {
+    std::span<std::string_view> familyNames;
 };
 
 // TODO handle subfamiles/opentype variants?
-// TODO maybe it would be better if we didn't make a copy of a Font object very time we resolve for fonts
 struct Font {
     std::string familyName;
     std::filesystem::path file;
+    FontFileType fileType;
 };
 
 struct FontSet {
-    std::vector<Font> fonts;
+    std::vector<const Font*> fonts;
 };
 
 enum class Resolver {
@@ -37,9 +65,12 @@ enum class Resolver {
 };
 
 struct ResolutionPreferences {
-    Resolver resolver = Resolver::PlatformDefault;
+    Resolver primaryResolver = Resolver::PlatformDefault;
+    // If the given primaryResolver cannot locate a given family name, fallback to this primaryResolver instead.
+    // If `fallbackResolver == primaryResolver`, no fallback action is going to happen.
+    Resolver fallbackResolver = Resolver::PlatformDefault;
 };
 
-FontSet Resolve(const FontDescription& desc, const ResolutionPreferences& pref);
+FontSet Resolve(const FamilyDescription& desc, const ResolutionPreferences& pref);
 
 } // namespace FontEnum
