@@ -47,30 +47,12 @@ struct FamilyDescription {
 };
 
 // TODO handle subfamiles/opentype variants?
-struct Font {
+struct UnloadedFont {
     std::string familyName;
     std::filesystem::path file;
     FontFileType fileType;
 };
 
-struct FontSet {
-    std::vector<const Font*> fonts;
-};
-
-enum class Resolver {
-    PlatformDefault,
-    DirectWrite,
-    CoreText,
-    FontConfig,
-};
-
-struct ResolutionPreferences {
-    Resolver primaryResolver = Resolver::PlatformDefault;
-    // If the given primaryResolver cannot locate a given family name, fallback to this primaryResolver instead.
-    // If `fallbackResolver == primaryResolver`, no fallback action is going to happen.
-    Resolver fallbackResolver = Resolver::PlatformDefault;
-};
-
-FontSet Resolve(const FamilyDescription& desc, const ResolutionPreferences& pref);
+std::vector<UnloadedFont> Resolve(const FamilyDescription& desc);
 
 } // namespace FontEnum

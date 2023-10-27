@@ -15,7 +15,7 @@
 namespace FontEnum {
 
 struct DwEnumeratedFont {
-    Font representativeFont;
+    UnloadedFont representativeFont;
     DWRITE_FONT_STYLE style;
     DWRITE_FONT_STRETCH stretch;
     DWRITE_FONT_WEIGHT weight;
