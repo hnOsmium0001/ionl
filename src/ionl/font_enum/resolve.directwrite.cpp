@@ -1,9 +1,12 @@
-#include "Resolve.DirectWrite.hpp"
+#include "resolve.hpp"
+#include "resolve_p.hpp"
 #ifdef FONT_ENUM_DWRITE_RESOLVER_AVAIL
 
 #include <wrl/client.h>
 #include <cstdint>
 #include <memory>
+
+#pragma comment(lib, "Dwrite")
 
 // Define `HRESULT hr;` at top of function to use this
 #define TRY_HRESULT(exp) \
@@ -11,7 +14,6 @@
     if (FAILED(hr)) continue
 
 using namespace FontEnum;
-using namespace FontEnum::details;
 namespace fs = std::filesystem;
 
 template <typename T>
@@ -62,8 +64,7 @@ static FontFileType MapDWriteFileTypeToOurs(DWRITE_FONT_FILE_TYPE fft) {
     return FontFileType::Unknown;
 }
 
-DwCtx::InitResult DwCtx::Init() noexcept {
-    using enum InitResult;
+DirectWriteContext::DirectWriteContext() {
     HRESULT hr;
 
     hr = DWriteCreateFactory(
@@ -71,17 +72,16 @@ DwCtx::InitResult DwCtx::Init() noexcept {
         __uuidof(IDWriteFactory),
         reinterpret_cast<IUnknown**>(&factory));
     if (FAILED(hr)) {
-        return FatalError;
+        factory = nullptr;
+        return;
     }
-
-    return Success;
 }
 
-DwCtx::~DwCtx() {
+DirectWriteContext::~DirectWriteContext() {
     SafeRelease(factory);
 }
 
-void DwCtx::EnumSystemFonts() {
+void DirectWriteContext::EnumSystemFonts() {
     HRESULT hr;
 
     ComPtr<IDWriteFontCollection> sysFontCollection;
@@ -202,11 +202,9 @@ void DwCtx::EnumSystemFonts() {
     }
 }
 
-void DwCtx::ClearKnownFonts() {
+void DirectWriteContext::ClearKnownFonts() {
     enumeratedFonts.clear();
     familyNameMap.clear();
 }
-
-DwCtx details::gDwCtx{};
 
 #endif

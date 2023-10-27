@@ -3,13 +3,14 @@
 // TODO "blob resolver" that lookups from a list of fonts compiled into the binary?
 //      have some kind of comp-time registration mechanism by declaring byte arrays or something
 
-#define FONT_ENUM_FS_RESOLVER_AVAIL
 #ifdef _WIN32
 #define FONT_ENUM_DWRITE_RESOLVER_AVAIL
 #endif
+
 #ifdef __APPLE__
 #define FONT_ENUM_CORETEXT_RESOLVER_AVAIL
 #endif
+
 #ifdef __linux__
 #define FONT_ENUM_FONTCONFIG_RESOLVER_AVAIL
 #endif
@@ -61,7 +62,6 @@ enum class Resolver {
     DirectWrite,
     CoreText,
     FontConfig,
-    Filesystem,
 };
 
 struct ResolutionPreferences {

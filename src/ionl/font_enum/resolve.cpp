@@ -1,13 +1,20 @@
-#include "Resolve.hpp"
+#include "resolve.hpp"
+#include "resolve_p.hpp"
 
-#include "Resolve.DirectWrite.hpp"
-#include "Resolve.Filesystem.hpp"
+#include <ionl/utils.hpp>
 
 namespace {
 using namespace FontEnum;
-using namespace FontEnum::details;
 
 bool DoFontDescResolution(FontSet& out, const FamilyDescription& desc, Resolver resolver) {
+#if defined(_WIN32)
+    static DirectWriteContext ctxDWrite;
+#elif defined(__APPLE__)
+    // TODO
+#elif defined(__linux__)
+    // TODO
+#endif
+
     if (resolver == Resolver::PlatformDefault) {
 #if defined(_WIN32)
         resolver = Resolver::DirectWrite;
@@ -15,8 +22,6 @@ bool DoFontDescResolution(FontSet& out, const FamilyDescription& desc, Resolver 
         resolver = Resolver::CoreText;
 #elif defined(__linux__)
         resolver = Resolver::FontConfig;
-#else
-        resolver = Resolver::Filesystem;
 #endif
     }
 
@@ -27,11 +32,11 @@ bool DoFontDescResolution(FontSet& out, const FamilyDescription& desc, Resolver 
         case DirectWrite: {
 #ifdef FONT_ENUM_DWRITE_RESOLVER_AVAIL
             for (std::string_view familyName : desc.familyNames) {
-                auto it = gDwCtx.familyNameMap.find(familyName);
-                if (it != gDwCtx.familyNameMap.end()) {
+                auto it = ctxDWrite.familyNameMap.find(familyName);
+                if (it != ctxDWrite.familyNameMap.end()) {
                     const DwFamily& fm = it->second;
                     for (size_t i = fm.begin; i < fm.end; ++i) {
-                        const DwEnumeratedFont& f = gDwCtx.enumeratedFonts[i];
+                        const DwEnumeratedFont& f = ctxDWrite.enumeratedFonts[i];
                         out.fonts.push_back(&f.representativeFont);
                     }
                 }
@@ -52,14 +57,6 @@ bool DoFontDescResolution(FontSet& out, const FamilyDescription& desc, Resolver 
 
         case FontConfig: {
 #ifdef FONT_ENUM_FONTCONFIG_RESOLVER_AVAIL
-            // TODO
-#else
-            return false;
-#endif
-        }
-
-        case Filesystem: {
-#ifdef FONT_ENUM_FS_RESOLVER_AVAIL
             // TODO
 #else
             return false;

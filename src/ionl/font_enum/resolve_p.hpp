@@ -1,18 +1,18 @@
 #pragma once
 
-#include "Resolve.hpp"
-#ifdef FONT_ENUM_DWRITE_RESOLVER_AVAIL
+#include <ionl/font_enum/resolve.hpp>
+#include <ionl/utils.hpp>
 
-#include "../Utils.hpp"
-
-#define WIN32_LEAN_AND_MEAN
-#include <dwrite.h>
 #include <robin_hood.h>
 #include <filesystem>
 #include <string>
 #include <vector>
 
-namespace FontEnum::details {
+#ifdef FONT_ENUM_DWRITE_RESOLVER_AVAIL
+#define WIN32_LEAN_AND_MEAN
+#include <dwrite.h>
+
+namespace FontEnum {
 
 struct DwEnumeratedFont {
     Font representativeFont;
@@ -27,26 +27,21 @@ struct DwFamily {
     size_t end;
 };
 
-struct DwCtx {
+struct DirectWriteContext {
     IDWriteFactory* factory = nullptr;
     std::vector<DwEnumeratedFont> enumeratedFonts;
     robin_hood::unordered_map<std::string, DwFamily, StringHash, StringEqual> familyNameMap;
 
-    enum class InitResult {
-        Success,
-        FatalError,
-    };
-    InitResult Init() noexcept;
-    ~DwCtx();
+    DirectWriteContext();
+    ~DirectWriteContext();
+
+    // Returns true if DirectWrite has failed to initialize and this backend is unavailable
+    bool IsErrornous() const { return factory == nullptr; }
 
     void EnumSystemFonts();
     void ClearKnownFonts();
-} ;
+};
 
-extern DwCtx gDwCtx;
+} // namespace FontEnum
 
-} // namespace FontEnum::details
-
-#else
-#warning "Included Resolve.DirectWrite.hpp when this resolver is not implemented (disabled by FONT_ENUM_DWRITE_RESOLVER_AVAIL)."
 #endif
